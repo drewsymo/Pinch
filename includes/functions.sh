@@ -69,5 +69,3 @@ function pinch_check() {
 		fi
 
 }
-
-}
