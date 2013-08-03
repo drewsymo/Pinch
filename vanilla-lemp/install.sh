@@ -6,30 +6,31 @@
 #
 # Installs a LEMP stack and sets up system for server production-environment.
 #
-# @package Pinch 2.0
+# @package Pinch 2.1
 # @since Pinch 1.0
 # @author Drew Morris
+# @author Vincent van daal
 #
 
 # Create Global Options
 
 ## Hostname Option
-PINCH_HOSTNAME="host.domain.com"
+read -e -p "Enter the hostname: " -i "replace_me.with_your_host.com" PINCH_HOSTNAME
 
 ## Timezone Option
-PINCH_TIMEZONE="Australia/NSW"
+read -e -p "Enter the timezone: " -i "Australia/NSW" PINCH_TIMEZONE
 
-## Custom SSH Option
-PINCH_SSH_PORT="3636"
+## Custom SSH Port
+read -e -p "Enter the custom SSH port: " -i "3636" PINCH_SSH_PORT
 
 ## New Root User
-PINCH_ROOT_USER="sudoninja"
+read -e -p "Enter the sudo user: " -i "sudoninja" PINCH_ROOT_USER
 
 ## Root User Password
-PINCH_ROOT_USER_PASSWORD="sudoninjapassword"
+read -e -p "Enter the sudo user password: " -i "sudoninjapassword" PINCH_ROOT_USER_PASSWORD
 
 ## MariaDB Root Password
-PINCH_MARIADB_PASSWORD="mariadbpassword"
+read -e -p "Enter the MariaDB root password: " -i "mariadbpassword" PINCH_MARIADB_PASSWORD
 
 (
 

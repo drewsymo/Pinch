@@ -6,9 +6,10 @@
 #
 # Do not deploy this script directly.
 #
-# @package Pinch 2.0
+# @package Pinch 2.1
 # @since Pinch 1.0
 # @author Drew Morris
+# @author Vincent van daal
 #
 
 # Essentials
@@ -17,15 +18,18 @@ function pinch_essentials() {
 	# Update System
 	yum -y update
 
+	# Remove Postfix and dependencies of installed
+	yum -y remove postfix
+	
 	# Install Essential Tools
-	yum -y install vim wget curl sudo jwhois bind-utils mlocate screen git
+	yum -y install vim wget curl sudo jwhois bind-utils mlocate screen git sendmail vixie-cron crontabs  perl-libwww-perl perl-Time-HiRes
 
 	# Set Hostname
-	echo "HOSTNAME=$PINCH_HOSTNAME" >> /etc/sysconfig/network
-	hostname "$PINCH_HOSTNAME"
+	echo "HOSTNAME=${PINCH_HOSTNAME}" >> /etc/sysconfig/network
+	hostname ${PINCH_HOSTNAME}
 
 	# Set Timezone
-	ln -s /usr/share/zoneinfo/$PINCH_TIMEZONE /etc/localtime
+	ln -s /usr/share/zoneinfo/${PINCH_TIMEZONE} /etc/localtime
 
 }
 
@@ -74,47 +78,76 @@ function pinch_mariadb() {
 function pinch_security() {
 
 	# Create new root user
-	adduser $PINCH_ROOT_USER
-	echo $PINCH_ROOT_USER_PASSWORD | passwd $PINCH_ROOT_USER --stdin
+	adduser ${PINCH_ROOT_USER}
+	echo ${PINCH_ROOT_USER_PASSWORD} | passwd ${PINCH_ROOT_USER} --stdin
 
-	# iptables Configuration
-	iptables -F
-	iptables -t nat -F
-	iptables -X
-	iptables -P FORWARD DROP
-	iptables -P INPUT   DROP
-	iptables -P OUTPUT  ACCEPT
-
-	## HTTP (varnish)
-	iptables -A INPUT -p tcp --dport 80 -j ACCEPT
-
-	## HTTP (nginx)
-	iptables -A INPUT -p tcp --dport 8080 -j ACCEPT
-
-	## HTTPS (SSL) Traffic
-	iptables -A INPUT -p tcp --dport 443 -j ACCEPT
-
-	## Local Loopback
-	iptables -A INPUT -i lo -p all -j ACCEPT
-
+	# Install CSF (Firewall)
+	cd /tmp
+	rm -rf csf/ csf.tgz
+	wget http://www.configserver.com/free/csf.tgz
+	tar -xzf csf.tgz
+	rm -f csf.tgz
+	cd csf
+	sh install.sh
+	cd /tmp
+	rm -rf csf/
+	echo "Testing IP Tables Modules..."
+	perl /etc/csf/csftest.pl
+	
+	# Adds custom values to csf.conf
+	#
+	# Based on source: csfinstall.inc and csftweaks.inc (centmin-v1.2.3mod) from the CentminMOD project (http://centminmod.com/)
+	#
+	
+	echo "CSF adding varnish port and changing SSH port in csf.conf"
+	sed -i 's/20,21,22,25,53,80,110,143,443,465,587,993,995/20,21,'${PINCH_SSH_PORT}',25,53,80,110,143,443,465,587,993,995,8080/g' /etc/csf/csf.conf
+	
+	sed -i "s/TCP_OUT = \"/TCP_OUT = \"111,2049,1110,/g" /etc/csf/csf.conf
+	sed -i "s/UDP_IN = \"/UDP_IN = \"111,2049,1110,/g" /etc/csf/csf.conf
+	sed -i "s/UDP_OUT = \"/UDP_OUT = \"111,2049,1110,/g" /etc/csf/csf.conf
+	
+	echo "Disabling CSF Testing mode (activating firewall)"
+	sed -i 's/TESTING = "1"/TESTING = "0"/g' /etc/csf/csf.conf
+	
+	sed -i 's/LF_DSHIELD = "0"/LF_DSHIELD = "86400"/g' /etc/csf/csf.conf
+	sed -i 's/LF_SPAMHAUS = "0"/LF_SPAMHAUS = "86400"/g' /etc/csf/csf.conf
+	sed -i 's/LF_EXPLOIT = "300"/LF_EXPLOIT = "86400"/g' /etc/csf/csf.conf
+	sed -i 's/LF_DIRWATCH = "300"/LF_DIRWATCH = "86400"/g' /etc/csf/csf.conf
+	sed -i 's/LF_INTEGRITY = "3600"/LF_INTEGRITY = "0"/g' /etc/csf/csf.conf
+	sed -i 's/LF_PARSE = "5"/LF_PARSE = "20"/g' /etc/csf/csf.conf
+	sed -i 's/LF_PARSE = "600"/LF_PARSE = "20"/g' /etc/csf/csf.conf
+	sed -i 's/PS_LIMIT = "10"/PS_LIMIT = "15"/g' /etc/csf/csf.conf
+	sed -i 's/PT_LIMIT = "60"/PT_LIMIT = "0"/g' /etc/csf/csf.conf
+	sed -i 's/PT_USERPROC = "10"/PT_USERPROC = "0"/g' /etc/csf/csf.conf
+	sed -i 's/PT_USERMEM = "200"/PT_USERMEM = "0"/g' /etc/csf/csf.conf
+	sed -i 's/PT_USERTIME = "1800"/PT_USERTIME = "0"/g' /etc/csf/csf.conf
+	sed -i 's/PT_LOAD = "30"/PT_LOAD = "600"/g' /etc/csf/csf.conf
+	sed -i 's/PT_LOAD_AVG = "5"/PT_LOAD_AVG = "15"/g' /etc/csf/csf.conf
+	sed -i 's/PT_LOAD_LEVEL = "6"/PT_LOAD_LEVEL = "8"/g' /etc/csf/csf.conf
+	
+	sed -i 's/LF_DISTATTACK = "0"/LF_DISTATTACK = "1"/g' /etc/csf/csf.conf
+	sed -i 's/LF_DISTFTP = "0"/LF_DISTFTP = "1"/g' /etc/csf/csf.conf
+	sed -i 's/LF_DISTFTP_UNIQ = "3"/LF_DISTFTP_UNIQ = "6"/g' /etc/csf/csf.conf
+	sed -i 's/LF_DISTFTP_PERM = "3600"/LF_DISTFTP_PERM = "6000"/g' /etc/csf/csf.conf
+	
+	sed -i 's/DENY_IP_LIMIT = \"100\"/DENY_IP_LIMIT = \"1000\"/' /etc/csf/csf.conf
+	sed -i 's/DENY_TEMP_IP_LIMIT = \"100\"/DENY_TEMP_IP_LIMIT = \"1000\"/' /etc/csf/csf.conf
+	
 	# SSH Configuration
 
 	## Disable UseDNS
 	sed -i 's/#UseDNS yes/UseDNS no/g' /etc/ssh/sshd_config
 
 	## Change Default SSH Port
-	if [[ -z "$PINCH_SSH_PORT" ]];
+	if [[ ! -z "${PINCH_SSH_PORT}" ]];
 		then
-			iptables -A INPUT -p tcp --dport 22 -j ACCEPT
-		else
-			iptables -A INPUT -p tcp --dport $PINCH_SSH_PORT -j ACCEPT
-			sed -i 's/#Port 22/Port '"$PINCH_SSH_PORT"'/g' /etc/ssh/sshd_config
+		sed -i 's/#Port 22/Port '"${PINCH_SSH_PORT}"'/g' /etc/ssh/sshd_config
 	fi
-
+	
 	## Deny / Allow SSH Users
 	sed -i 's/#PermitRootLogin yes/PermitRootLogin no/g' /etc/ssh/sshd_config
-	echo "$PINCH_ROOT_USER ALL=(ALL:ALL) ALL" >> /etc/sudoers
-	echo "AllowUsers $PINCH_ROOT_USER" >> /etc/ssh/sshd_config
+	echo "${PINCH_ROOT_USER} ALL=(ALL:ALL) ALL" >> /etc/sudoers
+	echo "AllowUsers ${PINCH_ROOT_USER}" >> /etc/ssh/sshd_config
 
 	# Networking / Sys Configuration
 
@@ -150,8 +183,11 @@ EOF
 	sed -i 's/SELINUX=disabled/SELINUX=enforcing/g' /etc/selinux/config
 
 	## Remove unnecessary Users
-	userdel apache && userdel games && userdel gopher && userdel postfix
-
+	REMOVERUSERS=("apache" "games" "gopher" "postfix")
+	for DELUSER in "${REMOVERUSERS[@]}"
+	do
+		userdel ${DELUSER}
+	done
 }
 
 # Configure LEMP Stack
@@ -180,7 +216,7 @@ function pinch_configure_lemp() {
 
 	## Customise PHP.ini
 	sed -i 's/disable_functions =/disable_functions = show_source, passthru, exec, popen, proc_open, allow_url_fopen, allow_url_include/g' /etc/php.ini
-	sed -i 's@;date.timezone =@date.timezone = Australia/Sydney@g' /etc/php.ini
+	sed -i 's@;date.timezone =@date.timezone = ${PINCH_TIMEZONE}@g' /etc/php.ini
 
 	## FastCGI Configuration
 	echo "fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;" >> /etc/nginx/fastcgi_params
@@ -190,18 +226,18 @@ function pinch_configure_lemp() {
 	sed -i 's/listen       80;/listen 8080;/g' /etc/nginx/conf.d/default.conf
 
 	## Tune Worker Processes & Connections (Not accurate for most para-virtualised systems)
-	WP=$(($CPU*2))
-	sed -i 's/worker_processes  1;/worker_processes '$WP';/g' /etc/nginx/nginx.conf
+	WP=$((${CPU}*2))
+	sed -i 's/worker_processes  1;/worker_processes '${WP}';/g' /etc/nginx/nginx.conf
 
-	WC=$((1024*$CPU))
-	sed -i 's/worker_connections  1024;/worker_connections '$WC';/g' /etc/nginx/nginx.conf
+	WC=$((1024*${CPU}))
+	sed -i 's/worker_connections  1024;/worker_connections '${WC}';/g' /etc/nginx/nginx.conf
 
 	# Varnish
 	## Customise Configuration
 	mv /etc/sysconfig/varnish /etc/sysconfig/varnish.bak
 
 	## Get Memory Allocation
-	MALLOC=$(($MEMORY*20/100))
+	MALLOC=$((${MEMORY}*20/100))
 
 	cat > /etc/sysconfig/varnish << EOF
 	DAEMON_OPTS="-a :80 \
@@ -218,15 +254,15 @@ EOF
 	## Tune MariaDB Server
 	rm -f /etc/my.cnf.d/server.cnf
 
-	if [[ $MEMORY -le 256 ]];
+	if [[ ${MEMORY} -le 256 ]];
 		then
 		cp /usr/share/mysql/my-small.cnf /etc/my.cnf.d/server.cnf
 
-	elif [[ $MEMORY -le 512 ]];
+	elif [[ ${MEMORY} -le 512 ]];
 		then
 		cp /usr/share/mysql/my-medium.cnf /etc/my.cnf.d/server.cnf
 
-	elif [[ $MEMORY -ge 1000 ]];
+	elif [[ ${MEMORY} -ge 1000 ]];
 		then
 		cp /usr/share/mysql/my-large.cnf /etc/my.cnf.d/server.cnf
 	fi
@@ -237,7 +273,7 @@ EOF
     echo "DELETE FROM mysql.user WHERE User='';" | mysql -u root
     echo "DELETE FROM mysql.user WHERE User='root' AND Host!='localhost';" | mysql -u root
     echo "DROP DATABASE test;" | mysql -u root
-    echo "UPDATE mysql.user SET Password=PASSWORD('$PINCH_MARIADB_PASSWORD') WHERE User='root';" | mysql -u root
+    echo "UPDATE mysql.user SET Password=PASSWORD('${PINCH_MARIADB_PASSWORD}') WHERE User='root';" | mysql -u root
     echo "FLUSH PRIVILEGES;" | mysql -u root
 
 }
@@ -253,6 +289,9 @@ function pinch_engage() {
 	chkconfig --add php-fpm && chkconfig php-fpm on
 	chkconfig --add varnish && chkconfig varnish on
 	chkconfig --add mysql && chkconfig mysql on
+	chkconfig --add csf && chkconfig csf on
+	chkconfig --add sendmail && chkconfig sendmail on
+	chkconfig --add crond && chkconfig crond on
 
 	# Launch Services
 	service nginx restart
@@ -260,5 +299,7 @@ function pinch_engage() {
 	service varnish restart
 	service mysql restart
 	service sshd restart
-
+	service sendmail restart
+	service crond start
+	csf -r
 }

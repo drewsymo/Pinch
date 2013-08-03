@@ -6,38 +6,39 @@
 #
 # Installs a LEMP stack and sets up system for server production-environment.
 #
-# @package Pinch 2.0
+# @package Pinch 2.1
 # @since Pinch 1.0
 # @author Drew Morris
+# @author Vincent van daal
 #
 
 # Create UDF Options
 
 ## Hostname Option
-#<udf name="pinch_hostname" label="Your server hostname"
+#<udf name="PINCH_HOSTNAME" label="Your server hostname"
 #    default="chewfargen.yourdomain.com"
 #    example="hillbilly.yourdomain.com">
 
 ## Timezone Option
-#<udf name="pinch_timezone" label="Your server timezone"
+#<udf name="PINCH_TIMEZONE" label="Your server timezone"
 #    default="Australia/NSW"
 #    example="America/Chicago">
 
 ## Custom SSH Option
-#<udf name="pinch_ssh_port" label="Set your SSH port"
+#<udf name="PINCH_SSH_PORT" label="Set your SSH port"
 #    default="3636"
 #    example="4914">
 
 ## New Root User
-#<udf name="root_user" label="Enter the username of the new root user"
+#<udf name="PINCH_ROOT_USER" label="Enter the username of the new root user"
 #    default="sudoninja"
 #    example="wackytubeman">
 
 ## New Root User Password
-#<udf name="root_password" label="Enter the password of the new root user (superuser)">
+#<udf name="PINCH_ROOT_USER_PASSWORD" label="Enter the password of the new root user (superuser)">
 
 ## MariaDB Root Password
-#<udf name="mariadb_root_password" label="Enter the root password for your MariaDB server">
+#<udf name="PINCH_MARIADB_PASSWORD" label="Enter the root password for your MariaDB server">
 
 (
 

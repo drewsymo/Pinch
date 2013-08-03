@@ -30,7 +30,7 @@ If you're on Linode, you can simply rebuild your instance with the `Pinch-instal
 	* Disables UseDNS
 	* Change default SSH port
 	* Enables SElinux
-	* Firewall via iptables
+	* Firewall via CSF / iptables
 	* Sets common network security parameters
 	* Disables IPv6
 	* Creates unprivledged www-data user for lemp components
